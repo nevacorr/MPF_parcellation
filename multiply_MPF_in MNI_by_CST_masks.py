@@ -7,6 +7,8 @@ from skimage import measure
 from scipy.ndimage import binary_erosion
 import csv
 
+erode_masks=1
+
 # Folder containing MPF images
 register_folder = '/Users/nevao/Documents/MPF_Project/freesurfer_scripts/register_to_SMATT_template'
 mpf_folder = os.path.join(register_folder, 'regmpf2mni_output/MPF_in_MNIadj_space_all_subj')
@@ -14,6 +16,13 @@ mpf_folder = os.path.join(register_folder, 'regmpf2mni_output/MPF_in_MNIadj_spac
 # Paths to your masks
 right_mask_file = os.path.join(register_folder, 'SMATT_roi_right.nii.gz')
 left_mask_file = os.path.join(register_folder, 'SMATT_roi_left.nii.gz')
+
+# Folder to save figures
+if erode_masks == 1:
+    fig_folder = os.path.join(register_folder, 'MPF_slice_overlays_eroded_masks')
+else:
+    fig_folder = os.path.join(register_folder, 'MPF_slice_overlays_noneroded_masks')
+os.makedirs(fig_folder, exist_ok=True)
 
 # Load masks
 right_mask = nib.load(right_mask_file).get_fdata().astype(bool)
@@ -23,10 +32,14 @@ left_mask = nib.load(left_mask_file).get_fdata().astype(bool)
 right_mask = np.squeeze(right_mask)
 left_mask = np.squeeze(left_mask)
 
-# Erode masks by 1 voxel
-structure = np.ones((3,3,3))  # 3x3x3 neighborhood
-right_mask_eroded = binary_erosion(right_mask, structure=structure, iterations=1)
-left_mask_eroded = binary_erosion(left_mask, structure=structure, iterations=1)
+if erode_masks == 1:
+    # Erode masks by 1 voxel
+    structure = np.ones((3,3,3))  # full 3x3x3 neighborhood
+    right_mask_eroded = binary_erosion(right_mask, structure=structure, iterations=1)
+    left_mask_eroded = binary_erosion(left_mask, structure=structure, iterations=1)
+else:
+    right_mask_eroded = right_mask
+    left_mask_eroded = left_mask
 
 # Prepare list for results
 results = []
@@ -79,9 +92,17 @@ for mpf_file in os.listdir(mpf_folder):
         for contour in contours_left:
             plt.plot(contour[:, 1], contour[:, 0], color='blue', linewidth=1)
 
-        plt.title(f"{subject_id}: Coronal slice {coronal_slice}")
+        if erode_masks == 1:
+            my_title = f"{subject_id}: Coronal slice {coronal_slice} eroded mask"
+        else:
+            my_title = f"{subject_id}: Coronal slice {coronal_slice} original mask"
+        plt.title(my_title)
         plt.axis('off')
-        # plt.show()
+
+        # Save figure to file
+        fig_path = os.path.join(fig_folder, f"{subject_id}_coronal_{coronal_slice}.png")
+        plt.savefig(fig_path, bbox_inches='tight', dpi=200)
+        plt.close()  # close figure to free memory
         # --------------------------------------
 
 # Convert to DataFrame
@@ -95,8 +116,12 @@ numeric_cols = [
 df[numeric_cols] = df[numeric_cols].astype(float)
 
 # Save as CSV
+if erode_masks == 1:
+    csv_filename = 'MPF_stats_in_S-MATT_roi_lt_rt_by_scan_eroded.csv'
+else:
+    csv_filename = 'MPF_stats_in_S-MATT_roi_lt_rt_by_scan_not_eroded.csv'
 df.to_csv(
-    os.path.join(register_folder, 'MPF_stats_in_S-MATT_roi_lt_rt_by_scan_not_eroded.csv'),
+    os.path.join(register_folder, csv_filename),
     index=False,
     float_format='%.0f',
     quoting=csv.QUOTE_MINIMAL

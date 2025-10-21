@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 from skimage import measure
 from scipy.ndimage import binary_erosion
 import csv
+import re
+import fnmatch
 
 erode_masks=1
 
@@ -49,7 +51,8 @@ coronal_slice = 108
 
 # Loop over all MPF images
 for mpf_file in os.listdir(mpf_folder):
-    if mpf_file.endswith('.nii.gz'):
+    if fnmatch.fnmatch(mpf_file, "H*reg_reg*.nii.gz"):
+    # if mpf_file.endswith('.nii.gz'):
         mpf_path = os.path.join(mpf_folder, mpf_file)
         mpf_img = nib.load(mpf_path)
         mpf_data = mpf_img.get_fdata()
@@ -117,9 +120,9 @@ df[numeric_cols] = df[numeric_cols].astype(float)
 
 # Save as CSV
 if erode_masks == 1:
-    csv_filename = 'MPF_stats_in_S-MATT_roi_lt_rt_by_scan_eroded.csv'
+    csv_filename = 'MPF_stats_in_S-MATT_roi_lt_rt_by_scan_eroded_regfiles.csv'
 else:
-    csv_filename = 'MPF_stats_in_S-MATT_roi_lt_rt_by_scan_not_eroded.csv'
+    csv_filename = 'MPF_stats_in_S-MATT_roi_lt_rt_by_scan_not_eroded_regfiles.csv'
 df.to_csv(
     os.path.join(register_folder, csv_filename),
     index=False,

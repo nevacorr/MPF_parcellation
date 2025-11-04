@@ -76,6 +76,12 @@ def scroll_viewer(img_data, mask_r, mask_l, view="coronal"):
     update(idx)
     plt.show()
 
+fixed_slices = {
+    "sagittal": 118,   # x-axis (left-right)
+    "coronal": 108,   # y-axis (front-back)
+    "axial": 80       # z-axis (inferior-superior)
+}
+
 # ------------------------- Process Each Subject -------------------------
 for mpf_file in os.listdir(mpf_folder):
     if fnmatch.fnmatch(mpf_file, "H*reg_reg*.nii.gz"):
@@ -86,11 +92,7 @@ for mpf_file in os.listdir(mpf_folder):
         print(f"Processing {subject_id}...")
 
         # Slice indices for each view
-        slice_indices = {
-            "sagittal": mpf_data.shape[0] // 2,
-            "coronal": mpf_data.shape[1] // 2,
-            "axial": mpf_data.shape[2] // 2
-        }
+        slice_indices = fixed_slices
 
         # --- Create a single figure with 3 subplots (1x3 layout) ---
         fig, axes = plt.subplots(1, 3, figsize=(18, 6))
@@ -111,26 +113,29 @@ for mpf_file in os.listdir(mpf_folder):
 
             ax.imshow(img_slice, cmap='gray', origin='lower')
             for contour in measure.find_contours(mask_r, 0.5):
-                ax.plot(contour[:, 1], contour[:, 0], color='red', linewidth=1)
+                ax.plot(contour[:, 1], contour[:, 0], color='blue', linewidth=1)
             for contour in measure.find_contours(mask_l, 0.5):
                 ax.plot(contour[:, 1], contour[:, 0], color='blue', linewidth=1)
 
-            ax.set_title(f"{view.capitalize()} slice {idx}")
+            # ax.set_title(f"{view.capitalize()} slice {idx}")
             ax.axis('off')
 
-        plt.suptitle(f"{subject_id} – Mask Overlays", fontsize=14)
+        # plt.suptitle(f"{subject_id} – Mask Overlays", fontsize=14)
         plt.tight_layout()
         plt.subplots_adjust(top=0.90)
+        plt.show()
 
         # Save one figure with all three views
-        out_path = os.path.join(fig_folder, f"{subject_id}_3view.png")
-        plt.savefig(out_path, bbox_inches='tight', dpi=200)
-        plt.close()
+        # out_path = os.path.join(fig_folder, f"{subject_id}_3view.png")
+        # plt.savefig(out_path, bbox_inches='tight', dpi=200)
+        # plt.close()
 
         # --- Optional interactive scrolling ---
         # Uncomment to scroll through each orientation interactively
-        scroll_viewer(mpf_data, right_mask, left_mask, view="coronal")
-        scroll_viewer(mpf_data, right_mask, left_mask, view="sagittal")
-        scroll_viewer(mpf_data, right_mask, left_mask, view="axial")
+        # scroll_viewer(mpf_data, right_mask, left_mask, view="coronal")
+        # scroll_viewer(mpf_data, right_mask, left_mask, view="sagittal")
+        # scroll_viewer(mpf_data, right_mask, left_mask, view="axial")
 
 print("✅ All subjects processed. Combined PNGs saved to:", fig_folder)
+
+#sag 118 ax 74 cor 115

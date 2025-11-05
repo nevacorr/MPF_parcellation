@@ -91,41 +91,100 @@ for mpf_file in os.listdir(mpf_folder):
 
         print(f"Processing {subject_id}...")
 
-        # Slice indices for each view
-        slice_indices = fixed_slices
+        # ------------------------- Load NIfTI -------------------------
+        img_nib = nib.load(mpf_path)
+        mpf_data = img_nib.get_fdata()
+        dx, dy, dz = img_nib.header.get_zooms()[:3]
+        nx, ny, nz = mpf_data.shape
 
-        # --- Create a single figure with 3 subplots (1x3 layout) ---
-        fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+        # ------------------------- Compute physical sizes -------------------------
+        x_size = nx * dx
+        y_size = ny * dy
+        z_size = nz * dz
 
-        for ax, (view, idx) in zip(axes, slice_indices.items()):
+        # Maximum field-of-view for black boxes
+        max_fov = max(x_size, y_size, z_size)
+
+        # ------------------------- Plot 3-view figure -------------------------
+        fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+
+        for ax, (view, idx) in zip(axes, fixed_slices.items()):
+
+            # ------------------------- Extract slice and voxel info -------------------------
             if view == "coronal":
                 img_slice = mpf_data[:, idx, :].T
                 mask_r = right_mask[:, idx, :].T
                 mask_l = left_mask[:, idx, :].T
+                voxel_x, voxel_y = dx, dz
+                slice_x, slice_y = x_size, z_size
+                scale_factor = 1.0
+                y_shift = 0.0
             elif view == "sagittal":
                 img_slice = mpf_data[idx, :, :].T
                 mask_r = right_mask[idx, :, :].T
                 mask_l = left_mask[idx, :, :].T
+                voxel_x, voxel_y = dy, dz
+                slice_x, slice_y = y_size, z_size
+                scale_factor = 1.0
+                y_shift = 0.0
             else:  # axial
                 img_slice = mpf_data[:, :, idx].T
                 mask_r = right_mask[:, :, idx].T
                 mask_l = left_mask[:, :, idx].T
+                voxel_x, voxel_y = dx, dy
+                slice_x, slice_y = x_size, y_size
+                scale_factor = 1.0  # zoom out axial slice
+                y_shift = -5.0  # move down in mm (adjust as needed)
 
-            ax.imshow(img_slice, cmap='gray', origin='lower')
-            for contour in measure.find_contours(mask_r, 0.5):
-                ax.plot(contour[:, 1], contour[:, 0], color='blue', linewidth=1)
-            for contour in measure.find_contours(mask_l, 0.5):
-                ax.plot(contour[:, 1], contour[:, 0], color='blue', linewidth=1)
+            # ------------------------- Center slice in black box -------------------------
+            slice_x_scaled = slice_x * scale_factor
+            slice_y_scaled = slice_y * scale_factor
+            x_offset = (max_fov - slice_x_scaled) / 2
+            y_offset = (max_fov - slice_y_scaled) / 2 + y_shift
 
-            # ax.set_title(f"{view.capitalize()} slice {idx}")
+            # Draw black background box (same size for all subplots)
+            ax.imshow(np.zeros((2, 2)), cmap='gray', origin='lower',
+                      extent=[0, max_fov, 0, max_fov], interpolation='nearest')
+
+            # Draw brain slice with correct voxel aspect ratio
+            extent = [x_offset, x_offset + slice_x_scaled,
+                      y_offset, y_offset + slice_y_scaled]
+            ax.imshow(img_slice, cmap='gray', origin='lower',
+                      interpolation='nearest', extent=extent,
+                      aspect=voxel_y / voxel_x)
+
+            # ------------------------- Overlay contours -------------------------
+            if view == "axial":
+                # scale and shift contours for axial slice
+                for contour in measure.find_contours(mask_r, 0.5):
+                    x_mm = contour[:, 1] * voxel_x * scale_factor + x_offset
+                    y_mm = contour[:, 0] * voxel_y * scale_factor + y_offset
+                    ax.plot(x_mm, y_mm, 'r', linewidth=1)
+                for contour in measure.find_contours(mask_l, 0.5):
+                    x_mm = contour[:, 1] * voxel_x * scale_factor + x_offset
+                    y_mm = contour[:, 0] * voxel_y * scale_factor + y_offset
+                    ax.plot(x_mm, y_mm, 'b', linewidth=1)
+            else:
+                # coronal and sagittal contours remain full size
+                for contour in measure.find_contours(mask_r, 0.5):
+                    x_mm = contour[:, 1] * voxel_x + x_offset
+                    y_mm = contour[:, 0] * voxel_y + y_offset
+                    ax.plot(x_mm, y_mm, 'r', linewidth=1)
+                for contour in measure.find_contours(mask_l, 0.5):
+                    x_mm = contour[:, 1] * voxel_x + x_offset
+                    y_mm = contour[:, 0] * voxel_y + y_offset
+                    ax.plot(x_mm, y_mm, 'b', linewidth=1)
+
+            # ------------------------- Set axis properties -------------------------
+            ax.set_xlim(0, max_fov)
+            ax.set_ylim(0, max_fov)
+            ax.set_aspect('equal')
             ax.axis('off')
 
-        # plt.suptitle(f"{subject_id} – Mask Overlays", fontsize=14)
-        plt.tight_layout()
-        plt.subplots_adjust(top=0.90)
+        # ------------------------- Adjust spacing -------------------------
+        plt.subplots_adjust(left=0.05, right=0.95, wspace=0.05)
         plt.show()
 
-        # Save one figure with all three views
         # out_path = os.path.join(fig_folder, f"{subject_id}_3view.png")
         # plt.savefig(out_path, bbox_inches='tight', dpi=200)
         # plt.close()
